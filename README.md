@@ -240,3 +240,4 @@ CWA_API_KEY = "CWA-YOUR-API-KEY-HERE"
 ## 📝 授權 (License)
 
 本專案僅供個人學習與課堂作業使用。氣象資料版權歸屬中央氣象署，使用須遵守 [CWA Open Data 使用規範](https://opendata.cwa.gov.tw/about)。
+# L3_CWAv2
