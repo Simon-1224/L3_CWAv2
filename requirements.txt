@@ -1,0 +1,21 @@
+# Taiwan Weather Forecast - Dependencies
+# 安裝方式：pip install -r requirements.txt
+
+# Core Web App Framework
+streamlit>=1.64.0
+
+# HTTP Client (CWA API)
+requests>=2.34.0
+
+# Data Processing
+pandas>=3.0.0
+
+# Interactive Charts
+plotly>=7.1.0
+
+# Interactive Maps
+folium>=0.20.0
+streamlit-folium>=0.27.0
+
+# Environment / Secret Management
+python-dotenv>=1.2.0

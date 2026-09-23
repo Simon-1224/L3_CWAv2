@@ -1,0 +1,23 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Environment & Secrets (CRITICAL: Do not upload API keys!)
+.env
+.streamlit/secrets.toml
+
+# SQLite Database
+*.db
+*.sqlite3
+data/*.db
+
+# OS generated files
+.DS_Store
+Thumbs.db
