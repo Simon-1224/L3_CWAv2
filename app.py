@@ -509,5 +509,17 @@ def main() -> None:
         )
 
 
+# Top-level exports for platforms like Vercel that scan for WSGI/ASGI entrypoints
+def app(environ=None, start_response=None):
+    if start_response:
+        start_response("200 OK", [("Content-Type", "text/plain; charset=utf-8")])
+    return [b"OK"]
+
+
+application = app
+handler = app
+
+
 if __name__ == "__main__":
     main()
+
