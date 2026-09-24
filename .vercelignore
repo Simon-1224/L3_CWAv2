@@ -1,8 +1,4 @@
-# Exclude Python backend files from Vercel Serverless Function detection
-# This ensures Vercel deploys the project as a pure static WebAssembly (stlite) site
-app.py
-*.py
-requirements.txt
+# Sensitive and cache files to exclude from Vercel deployments
 data.db
 .env
 .streamlit/
