@@ -19,3 +19,6 @@ streamlit-folium>=0.27.0
 
 # Environment / Secret Management
 python-dotenv>=1.2.0
+
+# WebAssembly Browser HTTP Client Support (for stlite)
+pyodide-http>=0.2.1

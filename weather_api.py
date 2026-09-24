@@ -9,6 +9,14 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
+# Enable requests in Pyodide / WebAssembly environment
+try:
+    import pyodide_http
+
+    pyodide_http.patch_all()
+except ImportError:
+    pass
+
 import requests
 
 import config

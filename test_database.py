@@ -18,6 +18,10 @@ def test_database_operations() -> bool:
     print("1. Initializing database schema...")
     database.init_database()
     assert config.DB_PATH.exists(), f"Database file not created at {config.DB_PATH}"
+    with database.get_db_connection() as conn:
+        conn.execute("DELETE FROM TemperatureForecasts")
+        conn.execute("DELETE FROM StationObservations")
+        conn.commit()
     print(f"   [PASS] Database initialized at: {config.DB_PATH}")
 
     # 2. Fetch data & Parse into DataFrames

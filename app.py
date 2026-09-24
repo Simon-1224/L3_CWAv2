@@ -246,21 +246,27 @@ def render_temperature_chart(df: pd.DataFrame, region_name: str) -> go.Figure:
         )
     )
 
-    # Styling Layout
+    # Styling Layout (Plotly 7.x compatible)
     fig.update_layout(
-        title=f"📈 {region_name} - 未來溫度預報折線圖",
-        title_font=dict(size=18, color="#0F172A", family="Inter, Noto Sans TC"),
+        title=dict(
+            text=f"📈 {region_name} - 未來溫度預報折線圖",
+            font=dict(size=18, color="#0F172A"),
+        ),
         xaxis=dict(
-            title="預報時段",
+            title=dict(
+                text="預報時段",
+                font=dict(size=14, color="#475569"),
+            ),
             gridcolor="#F1F5F9",
             tickangle=-15,
-            titlefont=dict(size=14, color="#475569"),
         ),
         yaxis=dict(
-            title="溫度 (°C)",
+            title=dict(
+                text="溫度 (°C)",
+                font=dict(size=14, color="#475569"),
+            ),
             gridcolor="#E2E8F0",
             zeroline=False,
-            titlefont=dict(size=14, color="#475569"),
         ),
         legend=dict(
             orientation="h",
@@ -290,6 +296,23 @@ def main() -> None:
     # ------------------ SIDEBAR ------------------
     st.sidebar.markdown("## 🌤️ Weather Forecast")
     st.sidebar.markdown("---")
+
+    # API Key Configuration (Essential for WebAssembly / Stlite deployment)
+    active_key = config.get_api_key()
+    if not active_key:
+        st.sidebar.markdown("### 🔑 API Key 設定")
+        input_key = st.sidebar.text_input(
+            "CWA API 授權碼",
+            type="password",
+            value=st.session_state.get("user_cwa_api_key", ""),
+            placeholder="請輸入 CWA-XXXXXXXX...",
+            help="若在瀏覽器 (stlite) 執行，請輸入中央氣象署 API 授權碼",
+        )
+        if input_key:
+            st.session_state["user_cwa_api_key"] = input_key.strip()
+            st.rerun()
+    else:
+        st.sidebar.caption("🔑 API 授權碼：已就緒")
 
     # 1. County Selection
     selected_region = st.sidebar.selectbox(

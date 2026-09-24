@@ -84,9 +84,10 @@ COUNTY_COORDINATES: Dict[str, Tuple[float, float]] = {
 
 
 def get_api_key() -> Optional[str]:
-    """Retrieve the CWA API Key from environment, .streamlit/secrets.toml, or .env.
+    """Retrieve the CWA API Key from session_state, environment, .streamlit/secrets.toml, or .env.
 
     Resolution precedence:
+    0. st.session_state["user_cwa_api_key"] (for WebAssembly / stlite user input)
     1. os.environ["CWA_API_KEY"]
     2. .streamlit/secrets.toml
     3. .env file
@@ -94,6 +95,23 @@ def get_api_key() -> Optional[str]:
     Returns:
         Optional[str]: The API key string if found, otherwise None.
     """
+    # 0. Check Streamlit session_state & secrets (crucial for stlite WebAssembly)
+    try:
+        import streamlit as st
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+        if get_script_run_ctx(suppress_warning=True) is not None:
+            if "user_cwa_api_key" in st.session_state and st.session_state["user_cwa_api_key"]:
+                key_candidate = str(st.session_state["user_cwa_api_key"]).strip()
+                if key_candidate:
+                    return key_candidate
+            if hasattr(st, "secrets") and "CWA_API_KEY" in st.secrets:
+                key_candidate = str(st.secrets["CWA_API_KEY"]).strip()
+                if key_candidate:
+                    return key_candidate
+    except Exception:
+        pass
+
     # 1. Check os.environ
     env_key = os.environ.get("CWA_API_KEY")
     if env_key and env_key.strip():
