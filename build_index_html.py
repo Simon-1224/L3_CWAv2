@@ -13,6 +13,7 @@ FILES_TO_EMBED = [
     "database.py",
     "map_utils.py",
     "weather_api.py",
+    "sqlite3.py",
 ]
 
 REQUIREMENTS = [
