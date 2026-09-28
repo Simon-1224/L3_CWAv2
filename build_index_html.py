@@ -82,6 +82,8 @@ def generate_index_html() -> str:
     <script src="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.75.0/build/stlite.js"></script>
     <script>
       const embeddedFiles = {files_json};
+      embeddedFiles["runtime_config.py"] =
+        "CWA_PROXY_URL = " + JSON.stringify(window.location.origin + "/api/cwa");
 
       stlite.mount(
         {{

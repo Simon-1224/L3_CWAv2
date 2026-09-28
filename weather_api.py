@@ -70,9 +70,9 @@ def get_weather_data(
     proxy_mode = config.use_cwa_proxy()
     if proxy_mode:
         try:
-            from js import window
+            from runtime_config import CWA_PROXY_URL
 
-            url = str(window.location.origin).rstrip("/") + "/api/cwa"
+            url = CWA_PROXY_URL
         except Exception as exc:
             raise WeatherAPIError(
                 "無法取得目前網站網址，請從 Vercel 部署頁面開啟本系統。"
