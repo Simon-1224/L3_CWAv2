@@ -7,6 +7,7 @@ and geographic reference constants for Taiwan counties and cities.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -83,6 +84,11 @@ COUNTY_COORDINATES: Dict[str, Tuple[float, float]] = {
 }
 
 
+def use_cwa_proxy() -> bool:
+    """Return True when running in Pyodide, where CWA requests use the Vercel proxy."""
+    return sys.platform == "emscripten"
+
+
 def get_api_key() -> Optional[str]:
     """Retrieve the CWA API Key from session_state, environment, .streamlit/secrets.toml, or .env.
 
@@ -95,7 +101,11 @@ def get_api_key() -> Optional[str]:
     Returns:
         Optional[str]: The API key string if found, otherwise None.
     """
-    # 0. Check Streamlit session_state & secrets (crucial for stlite WebAssembly)
+    # In the browser, credentials stay on the Vercel server and are never loaded into Pyodide.
+    if use_cwa_proxy():
+        return None
+
+    # 0. Check Streamlit session_state & secrets (crucial for local Streamlit)
     try:
         import streamlit as st
         from streamlit.runtime.scriptrunner import get_script_run_ctx

@@ -143,8 +143,9 @@ def fetch_and_save_weather() -> Tuple[bool, str]:
     Returns:
         Tuple[bool, str]: Success flag and status message.
     """
-    api_key = config.get_api_key()
-    if not api_key:
+    proxy_mode = config.use_cwa_proxy()
+    api_key = None if proxy_mode else config.get_api_key()
+    if not proxy_mode and not api_key:
         return False, "尚未設定 CWA API Key，請先設定 secrets.toml 或 .env 檔案。"
 
     try:
@@ -290,29 +291,32 @@ def main() -> None:
 
     # If database is completely empty on launch, attempt initial fetch automatically
     df_check = load_weather_data()
-    if df_check.empty and config.get_api_key():
+    if df_check.empty and (config.use_cwa_proxy() or config.get_api_key()):
         fetch_and_save_weather()
 
     # ------------------ SIDEBAR ------------------
     st.sidebar.markdown("## 🌤️ Weather Forecast")
     st.sidebar.markdown("---")
 
-    # API Key Configuration (Essential for WebAssembly / Stlite deployment)
-    active_key = config.get_api_key()
-    if not active_key:
-        st.sidebar.markdown("### 🔑 API Key 設定")
-        input_key = st.sidebar.text_input(
-            "CWA API 授權碼",
-            type="password",
-            value=st.session_state.get("user_cwa_api_key", ""),
-            placeholder="請輸入 CWA-XXXXXXXX...",
-            help="若在瀏覽器 (stlite) 執行，請輸入中央氣象署 API 授權碼",
-        )
-        if input_key:
-            st.session_state["user_cwa_api_key"] = input_key.strip()
-            st.rerun()
+    # In Pyodide, the Vercel Function keeps the CWA key server-side.
+    if config.use_cwa_proxy():
+        st.sidebar.caption("🔒 API 授權由 Vercel 安全代管")
     else:
-        st.sidebar.caption("🔑 API 授權碼：已就緒")
+        active_key = config.get_api_key()
+        if not active_key:
+            st.sidebar.markdown("### 🔑 API Key 設定")
+            input_key = st.sidebar.text_input(
+                "CWA API 授權碼",
+                type="password",
+                value=st.session_state.get("user_cwa_api_key", ""),
+                placeholder="請輸入 CWA-XXXXXXXX...",
+                help="若在瀏覽器 (stlite) 執行，請輸入中央氣象署 API 授權碼",
+            )
+            if input_key:
+                st.session_state["user_cwa_api_key"] = input_key.strip()
+                st.rerun()
+        else:
+            st.sidebar.caption("🔑 API 授權碼：已就緒")
 
     # 1. County Selection
     selected_region = st.sidebar.selectbox(

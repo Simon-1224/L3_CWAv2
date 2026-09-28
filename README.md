@@ -381,15 +381,14 @@ CWA_API_KEY = "CWA-YOUR-API-KEY-HERE"
 
 ## ⚡ Vercel (stlite / WebAssembly) 部署說明
 
-本專案支援免伺服器 (Serverless) 的純靜態 WebAssembly (stlite) 部署於 Vercel：
+本專案以 Stlite 在瀏覽器呈現介面，並由 Vercel Function 代為呼叫中央氣象署 API。授權碼只保存在 Vercel 伺服器環境變數，不會嵌入 index.html。
 
-1. 專案已打包包含 `index.html`（使用 `@stlite/mountable`）與 `vercel.json`（單頁路由重寫）。
-2. 在 [Vercel](https://vercel.com/) 點選 **Add New...** → **Project**。
-3. 匯入本 GitHub Repository。
-4. Framework Preset 選擇 **Other**，Build Command 與 Output Directory 保留空白預設。
-5. 點選 **Deploy** 即完成部署！
-6. 開啟部署網址後，若瀏覽器端未預設金鑰，可於側邊欄輸入中央氣象署 API 授權碼，點擊「🔄 更新氣象資料」即可由瀏覽器端直接連線 CWA API 載入全台即時氣象資訊！
+1. 將本 GitHub Repository 匯入 [Vercel](https://vercel.com/)，Framework Preset 選擇 **Other**。
+2. 在 Vercel 專案開啟 **Settings → Environment Variables**，新增 CWA_API_KEY，值填入中央氣象署 API 授權碼，並勾選要使用的環境（通常是 Production）。
+3. 儲存環境變數後重新部署，讓新的 Function 取得設定。
+4. 開啟部署網址；側邊欄會顯示授權由 Vercel 代管，按「🔄 更新氣象資料」即可載入資料，不必在網頁輸入授權碼。
 
+本機執行 Streamlit 時仍可使用 .streamlit/secrets.toml 或 CWA_API_KEY 環境變數。請勿將授權碼提交到 GitHub。
 ---
 
 ## 📝 授權 (License)

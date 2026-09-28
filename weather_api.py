@@ -67,24 +67,36 @@ def get_weather_data(
         WeatherAPIError: If API key is missing, network fails, status code != 200,
                          or response payload indicates failure.
     """
-    token = api_key or config.get_api_key()
-    if not token or not token.strip():
-        raise WeatherAPIError(
-            "尚未設定 CWA API Key，請先設定 secrets.toml 或 .env 檔案。"
-        )
+    proxy_mode = config.use_cwa_proxy()
+    if proxy_mode:
+        try:
+            from js import window
 
-    url = f"{config.CWA_BASE_URL}/{dataset_id}"
-    params: Dict[str, Any] = {
-        "Authorization": token.strip(),
-    }
-    if location_name:
-        params["locationName"] = location_name
+            url = str(window.location.origin).rstrip("/") + "/api/cwa"
+        except Exception as exc:
+            raise WeatherAPIError(
+                "無法取得目前網站網址，請從 Vercel 部署頁面開啟本系統。"
+            ) from exc
+        params: Dict[str, Any] = {"dataset": dataset_id}
+        if location_name:
+            params["locationName"] = location_name
+        token = None
+    else:
+        token = api_key or config.get_api_key()
+        if not token or not token.strip():
+            raise WeatherAPIError(
+                "尚未設定 CWA API Key，請先設定 secrets.toml 或 .env 檔案。"
+            )
+        url = f"{config.CWA_BASE_URL}/{dataset_id}"
+        params = {"Authorization": token.strip()}
+        if location_name:
+            params["locationName"] = location_name
 
     logger.info(
         "Requesting CWA API: dataset=%s, location=%s, key=%s",
         dataset_id,
         location_name or "ALL",
-        mask_key(token),
+        "<Vercel server proxy>" if proxy_mode else mask_key(token),
     )
 
     try:
@@ -96,6 +108,13 @@ def get_weather_data(
         ) from exc
     except requests.exceptions.HTTPError as exc:
         status_code = response.status_code if "response" in locals() else None
+        if proxy_mode and status_code in (502, 503):
+            try:
+                proxy_error = response.json().get("error")
+            except (ValueError, AttributeError):
+                proxy_error = None
+            if proxy_error:
+                raise WeatherAPIError(str(proxy_error)) from exc
         if status_code in (401, 403):
             raise WeatherAPIError(
                 "中央氣象署 API 授權失敗（HTTP 401/403），請確認 API Key 是否正確且有效。"
