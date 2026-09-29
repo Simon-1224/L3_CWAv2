@@ -1,397 +1,290 @@
-# 🌤️ Taiwan Weather Forecast Dashboard
-
-> **AI 創新微課程 ── Homework 1**
->
-> 學生：＿＿＿＿＿ ／ 學號：＿＿＿＿＿ ／ 繳交日期：2026-09-23
-
----
-
-## 📋 一、作業資訊 (Assignment Info)
+# Homework 1：臺灣氣象資料分析與互動式儀表板
 
 | 項目 | 內容 |
-|------|------|
+| --- | --- |
 | 課程名稱 | AI 創新微課程 |
-| 作業編號 | Homework 1 |
-| 作業主題 | 氣象開放資料串接與互動式 Dashboard 實作 |
-| 使用語言 | Python 3.11+ |
-| 繳交方式 | GitHub Repository |
+| 作業主題 | 中央氣象署開放資料串接、資料儲存與視覺化 |
+| 專案名稱 | Taiwan Weather Forecast Dashboard |
+| 姓名／學號 | ＿＿陳俊安＿＿＿＿／5115056023＿＿＿＿＿＿ |
+| 報告整理日期 | 2026 年 9 月 29 日 |
 
----
+## 一、摘要
 
-## 📌 二、作業目標 (Objective)
+本作業以臺灣氣象資料為主題，整合中央氣象署（CWA）開放資料、Python、Pandas、SQLite 與 Streamlit，建立可查詢縣市天氣預報及測站觀測資料的互動式儀表板。系統將 API 回傳的巢狀 JSON 轉換為表格，儲存後提供地區查詢、預報指標、溫度折線圖、資料表與互動地圖，呈現「資料擷取 → 整理 → 儲存 → 查詢 → 視覺化」的完整流程。
 
-本作業旨在透過串接**中央氣象署（CWA）Open Data API**，實作一套完整的氣象資料擷取、儲存與視覺化流程，並以 Streamlit 建立互動式 Web Dashboard，達成以下學習目標：
+除了本機 Streamlit 執行方式，專案也提供 Stlite 瀏覽器版本，透過 Vercel Function 代理氣象資料請求。本報告依現有程式與本機資料庫整理實作成果，並說明資料解讀、測試範圍及目前限制。
 
-1. 了解 RESTful API 串接方式（`requests`、JSON 解析）
-2. 使用 `Pandas` 進行資料清洗與轉換
-3. 使用 `SQLite` 進行本地資料持久化儲存（CRUD、SQL 查詢）
-4. 以 `Streamlit` 建立互動式 Web 應用程式
-5. 整合 `Plotly` 折線圖與 `Folium` 互動地圖進行資料視覺化
+## 二、作業動機與目標
 
----
+氣象開放資料包含地點、時間與多種天氣要素，直接閱讀原始 JSON 不易比較不同時段或地區的變化。因此，本作業將分散的資料整理成一致格式，讓使用者能透過圖表與地圖理解資訊，同時練習資料應用系統的模組化設計。
 
-## 🏗️ 三、系統架構 (System Architecture)
+本作業的主要目標如下：
 
-### 整體資料流程
+1. 使用 HTTP API 取得天氣預報與測站觀測資料，處理連線與授權錯誤。
+2. 使用 Pandas 整理資料欄位、數值型別、時間區間及重複紀錄。
+3. 設計 SQLite 資料表，實作新增、更新及依條件查詢。
+4. 使用 Streamlit、Plotly 與 Folium 呈現互動式分析介面。
+5. 理解本機 Python 與瀏覽器 WebAssembly 執行環境的差異。
 
-```
-CWA Open Data API
-  ├── O-A0003-001（全台 363 自動氣象站即時觀測）
-  └── F-C0032-001（22 縣市今明 36 小時天氣預報）
-        ↓ requests.get()
-    weather_api.py（API 連線層）
-        ↓ JSON Response
-    data_processor.py（資料解析 & Pandas 轉換層）
-        ↓ DataFrame
-    database.py（SQLite 持久化層）
-        ↓ SQL Query
-    app.py（Streamlit Dashboard 呈現層）
+## 三、使用技術與資料來源
+
+### 3.1 技術工具
+
+| 技術／工具 | 本作業中的用途 |
+| --- | --- |
+| Python | 撰寫 API 串接、資料整理、資料庫與介面邏輯 |
+| Requests | 發送 HTTP 請求，處理逾時及錯誤回應 |
+| Pandas | 將 JSON 轉為 DataFrame，進行型別轉換、排序與篩選 |
+| SQLite | 在本機保存預報與測站資料，透過 SQL 查詢 |
+| Streamlit | 建立側邊欄、指標卡、分頁與互動操作介面 |
+| Plotly | 繪製最高溫與最低溫的預報折線圖 |
+| Folium、streamlit-folium | 顯示縣市標記、測站群聚及地圖資訊視窗 |
+| Stlite、Pyodide、pyodide-http | 在瀏覽器執行 Python 應用並支援 HTTP 請求 |
+| Vercel Function | 以伺服器環境變數保存授權碼，代理 CWA API 請求 |
+
+本機套件版本需求列於 `requirements.txt`；瀏覽器版的套件清單由 `build_index_html.py` 另外設定。兩種環境的相容性需分別驗證。
+
+### 3.2 資料來源與欄位意義
+
+程式使用中央氣象署的兩個資料集：
+
+| 資料集代碼 | 專案用途 | 主要欄位 |
+| --- | --- | --- |
+| `F-C0032-001` | 各縣市今明 36 小時天氣預報 | 縣市、預報起訖時間、天氣現象、降雨機率、最低溫、最高溫 |
+| `O-A0003-001` | 測站氣象觀測 | 測站名稱與代碼、觀測時間、位置、氣溫、雨量等 |
+
+預報資料描述未來時段的天氣條件，觀測資料記錄測站某一時間的量測結果。兩者在系統中分開儲存，解讀時也應區分。測站總數與有效資料筆數以每次取得的內容為準。
+
+## 四、系統架構與程式分工
+
+### 4.1 本機資料流程
+
+```text
+中央氣象署 CWA API
+        ↓ HTTP 請求
+weather_api.py：取得並檢查 JSON 回應
         ↓
-    Plotly 折線圖 + Folium 互動地圖 + 資料表
+data_processor.py：解析、轉型與整理資料
+        ↓ DataFrame
+database.py：寫入 SQLite（data.db）
+        ↓ 依縣市、日期等條件查詢
+app.py：Streamlit 儀表板
+        ├─ 天氣指標卡
+        ├─ Plotly 溫度折線圖
+        ├─ 預報資料表
+        └─ map_utils.py：Folium 互動地圖
 ```
 
-### 專案目錄結構
+### 4.2 瀏覽器版資料流程
 
-```
-HW1/
-│
-├── app.py               # Streamlit 主應用程式（UI 渲染與互動）
-├── weather_api.py       # CWA API 連線模組（requests + 錯誤處理）
-├── data_processor.py    # JSON 解析 & DataFrame 轉換
-├── database.py          # SQLite CRUD 操作（資料表初始化、查詢）
-├── map_utils.py         # Folium 互動地圖生成
-├── config.py            # 設定集中管理（API Key、縣市清單、座標）
-│
-├── data/                # 資料目錄
-├── data.db              # SQLite 資料庫（gitignored）
-│
-├── .streamlit/
-│   ├── secrets.toml         # 🔐 API Key（gitignored）
-│   └── secrets.toml.example
-│
-├── requirements.txt         # Python 依賴套件清單
-├── .gitignore
-├── README.md                # 本報告文件
-│
-├── test_cwa_api.py          # 單元測試：API 連線
-├── test_data_processor.py   # 單元測試：JSON→DataFrame
-└── test_database.py         # 單元測試：SQLite SQL 查詢
+```text
+build_index_html.py → index.html（內嵌 Python 程式）
+                           ↓
+                 Stlite／Pyodide 瀏覽器執行環境
+                           ↓ 同來源 /api/cwa 請求
+                 api/cwa.js（Vercel Function）
+                           ↓ 伺服器加入 CWA_API_KEY
+                      中央氣象署 API
 ```
 
----
+瀏覽器版的 Python 介面在使用者瀏覽器內執行，Vercel Function 負責代理 API。`database.py` 會檢查 SQLite 是否可用；無法使用時改以 Python 記憶體清單保存資料。此版本未實作跨瀏覽器工作階段的持久化，也不共用本機 `data.db`。
 
-## 🛠️ 四、技術棧 (Tech Stack)
+### 4.3 專案檔案分工
 
-| 層次 | 技術 / 套件 | 版本要求 | 用途說明 |
-|------|-------------|----------|----------|
-| 語言 | **Python** | 3.11+ | 主要開發語言 |
-| Web 框架 | **Streamlit** | ≥ 1.64 | 互動式 Dashboard |
-| API 連線 | **Requests** | ≥ 2.34 | HTTP GET 呼叫 CWA API |
-| 資料處理 | **Pandas** | ≥ 3.0 | JSON 解析、DataFrame 轉換 |
-| 資料庫 | **SQLite** | 內建 | 本地持久化儲存，無需額外安裝 |
-| 圖表 | **Plotly** | ≥ 7.1 | 互動式溫度折線圖 |
-| 地圖 | **Folium** + **streamlit-folium** | ≥ 0.20 | 全台天氣互動地圖 |
-| 機密管理 | **python-dotenv** | ≥ 1.2 | API Key 安全載入 |
-| 資料來源 | **CWA Open Data API** | — | 氣象原始資料 |
+| 檔案 | 職責 |
+| --- | --- |
+| `app.py` | 整合資料更新、查詢快取、地區與日期選單及儀表板 |
+| `weather_api.py` | 封裝預報與觀測 API，統一使用 `WeatherAPIError` 回報錯誤 |
+| `data_processor.py` | 解析 JSON，整理預報與測站 DataFrame |
+| `database.py` | 建立資料表、更新紀錄、查詢資料及提供記憶體替代儲存 |
+| `map_utils.py` | 建立縣市標記、測站群聚及地圖資訊視窗 |
+| `config.py` | 集中設定資料集代碼、縣市座標、資料庫路徑與授權碼讀取方式 |
+| `build_index_html.py` | 將 Python 模組嵌入 Stlite 網頁入口 |
+| `index.html` | 產生後的瀏覽器版入口檔案 |
+| `api/cwa.js` | 驗證請求參數並代理 CWA 資料請求 |
+| `vercel.json` | Vercel 專案與路由設定 |
+| `test_*.py` | API、解析、資料庫及圖表的驗證腳本 |
+| `requirements.txt` | 本機 Python 套件需求 |
 
----
+## 五、實作方法
 
-## ✨ 五、功能說明 (Features)
+### 5.1 API 串接與錯誤處理
 
-| # | 功能 | 說明 |
-|---|------|------|
-| 1 | 📍 地區選擇 | 下拉選單選擇全台 22 縣市 |
-| 2 | 📅 日期篩選 | 依可用日期篩選預報資料 |
-| 3 | 🌡️ 最高溫 (MaxT) | 顯示選定地區當日最高氣溫預測 |
-| 4 | ❄️ 最低溫 (MinT) | 顯示選定地區當日最低氣溫預測 |
-| 5 | ☔ 降雨機率 (PoP) | 各時段降雨機率百分比 |
-| 6 | ☁️ 天氣現象 (Wx) | 天氣描述（晴、多雲、陰雨等） |
-| 7 | 📈 溫度折線圖 | Plotly 互動式 MaxT / MinT 折線圖 |
-| 8 | 📊 天氣資料表 | 結構化時段預報表格 |
-| 9 | 🗺️ 台灣天氣地圖 | Folium 互動地圖，22 縣市標記 + 363 觀測站群聚圖層 |
-| 10 | 🔄 手動更新 | 點擊按鈕即時向 CWA API 取得最新資料 |
-| 11 | 🕒 更新時間戳 | 顯示資料最後更新時間 |
+`weather_api.py` 提供 `get_forecast_data()` 與 `get_observation_data()`，共用 `get_weather_data()` 發送請求。本機模式會讀取設定的授權碼；Pyodide 模式則呼叫同來源代理端點，授權碼由 Vercel Function 加入。
 
----
+請求預設逾時為 15 秒。程式會檢查 HTTP 狀態、JSON 格式與回應的 `success` 欄位，並將缺少授權碼、授權失敗、資料集不存在及連線異常等情況轉成錯誤訊息。預報更新成功後，系統接著嘗試更新觀測資料；若觀測更新失敗，會記錄警告，仍保留已取得的預報。
 
-## 📡 六、資料流程詳述 (Data Flow)
+### 5.2 資料整理
 
-### Step 1 — API 資料擷取（`weather_api.py`）
+預報 JSON 將天氣要素分別存放在不同陣列。`parse_forecast_json()` 使用「開始時間＋結束時間」對齊 `Wx`、`PoP`、`MinT` 與 `MaxT`，再由開始時間取出 `dataDate`，形成每個縣市、每個預報區間一筆的資料表。完成後依縣市與時間排序，並移除相同縣市、起訖時間的重複資料。
 
-```python
-# 取得 36 小時天氣預報（22 縣市）
-fc_json = weather_api.get_forecast_data(api_key=api_key)
+`parse_observation_json()` 擷取測站名稱、代碼、縣市、鄉鎮、時間及氣象數值；座標優先選取 WGS84。`safe_float()` 將有效值轉為浮點數，遇到空值、無法轉換的內容或程式辨識的 `-99` 缺測值時，回傳呼叫端指定的預設值。
 
-# 取得全台 363 自動氣象站即時觀測
-obs_json = weather_api.get_observation_data(api_key=api_key)
-```
+目前預報缺值會以 `PoP=0`、`MinT=20`、`MaxT=28` 等預設值補入。這些值是程式的補值設定，不能當作氣象署實際提供的數值。觀測資料目前把相對濕度存入 `PoP` 欄位，該欄位在觀測表中不代表降雨機率，後續應獨立命名。
 
-- 使用 `requests.get()` 發送 HTTP GET 請求
-- 包含完整錯誤處理（HTTP 狀態碼、Timeout、API 錯誤回應）
+### 5.3 資料庫設計
 
-### Step 2 — 資料清洗與轉換（`data_processor.py`）
+| 資料表 | 主要欄位 | 唯一條件與更新方式 |
+| --- | --- | --- |
+| `TemperatureForecasts` | `regionName`、`dataDate`、`startTime`、`endTime`、`Wx`、`PoP`、`MinT`、`MaxT`、`temp`、`updatedAt` | 以縣市與預報起訖時間為唯一組合；相同組合更新原紀錄 |
+| `StationObservations` | `stationId`、`stationName`、`regionName`、`townName`、時間欄位、`temp`、`MinT`、`MaxT`、`Wx`、`PoP`、`precipitation`、`latitude`、`longitude`、`updatedAt` | 以測站代碼為唯一值；更新時覆寫該測站紀錄 |
 
-```python
-df_fc  = data_processor.parse_forecast_json(fc_json)
-# → DataFrame: regionName, dataDate, startTime, endTime, MaxT, MinT, PoP, Wx
+兩張資料表另有自動編號 `id`。資料寫入採用 `INSERT ... ON CONFLICT ... DO UPDATE`，避免重複更新時一直新增相同資料。預報表可累積不同時段；觀測表則保存各測站最近一次寫入的狀態，尚未建立測站歷史時間序列。
 
-df_obs = data_processor.parse_observation_json(obs_json)
-# → DataFrame: stationId, stationName, county, lat, lon, Temperature, ...
-```
-
-- 處理缺值、欄位型別轉換、重複資料去除
-
-### Step 3 — 資料持久化（`database.py`）
+依地區查詢的 SQL 範例如下，縣市名稱透過參數傳入：
 
 ```sql
--- 天氣預報表
-CREATE TABLE TemperatureForecasts (
-    regionName TEXT, dataDate TEXT, startTime TEXT, endTime TEXT,
-    MaxT REAL, MinT REAL, PoP REAL, Wx TEXT,
-    UNIQUE (regionName, startTime, endTime)   -- 防止重複寫入
-);
-
--- 觀測站資料表
-CREATE TABLE StationObservations (
-    stationId TEXT, stationName TEXT, county TEXT,
-    lat REAL, lon REAL, Temperature REAL, ...
-);
-```
-
-### Step 4 — SQL 查詢與 Dashboard 呈現（`app.py`）
-
-```sql
-SELECT * FROM TemperatureForecasts
+SELECT regionName, dataDate, startTime, endTime, Wx, PoP, MinT, MaxT
+FROM TemperatureForecasts
 WHERE regionName = ?
-ORDER BY startTime;
+ORDER BY startTime ASC;
 ```
 
----
+### 5.4 儀表板與視覺化
 
-## 📦 七、各模組說明 (Module Details)
+| 功能 | 實作內容 |
+| --- | --- |
+| 地區選擇 | 提供 22 縣市選單，預設為臺中市 |
+| 日期選擇 | 從選定縣市已儲存的預報日期產生選項，用於上方指標卡 |
+| 四項天氣指標 | 顯示所選日期第一個預報時段的最高溫、最低溫、降雨機率與天氣現象 |
+| 溫度折線圖 | 以紅、藍兩條線呈現選定縣市的各筆最高溫與最低溫預報 |
+| 天氣資料表 | 顯示選定縣市的日期、時段、天氣、溫度與降雨機率 |
+| 全臺天氣地圖 | 顯示縣市概況，並將具有有效座標與氣溫的測站放入群聚圖層 |
+| 資料更新 | 提供手動更新按鈕；首次啟動且預報資料為空、授權條件具備時嘗試載入 |
+| 查詢快取 | 對資料庫讀取設定 600 秒快取，成功更新後清除相關快取 |
 
-| 模組 | 功能 |
-|------|------|
-| `app.py` | Streamlit 主程式，整合所有模組，負責 UI 渲染與使用者互動。包含 4 張 Metric Card、Plotly 圖表、資料表與 Folium 地圖 |
-| `weather_api.py` | 封裝 CWA API 呼叫，提供 `get_observation_data()` 與 `get_forecast_data()`，內含完整錯誤處理與自訂 `WeatherAPIError` 例外 |
-| `data_processor.py` | 將 CWA JSON 解析為結構化 Pandas DataFrame，處理缺值、型別轉換與重複資料 |
-| `database.py` | SQLite CRUD 操作、資料表初始化、SQL 查詢函式（依地區 / 日期查詢）、UNIQUE constraint 防止重複寫入 |
-| `map_utils.py` | 以 Folium 生成互動式台灣天氣地圖，縣市標記顏色依氣溫動態變化，並提供 363 觀測站群聚圖層 |
-| `config.py` | 集中管理 API 端點、資料集代碼、22 縣市清單、座標辭典、安全金鑰讀取邏輯 |
+指標卡目前取篩選結果的第一筆，並非計算全天最高或最低值。折線圖與資料表使用該縣市全部已儲存的預報，地圖使用各縣市第一筆預報；它們未同步套用日期選單。地圖缺少縣市 `temp` 時，以 `(MinT + MaxT) / 2` 計算顯示用代表值，該數值並非測站實測氣溫；缺少整個縣市預報時則會顯示預設值。
 
----
+## 六、實作成果與驗證
 
-## 🚀 八、環境建置與啟動 (Installation & Run)
+### 6.1 本機資料檢查結果
 
-### 1. 建立虛擬環境
+本報告於 2026 年 9 月 29 日，以 SQLite 唯讀模式查詢現有 `data.db`，結果如下。此處為既存資料快照，未重新向 CWA 取得即時資料。
 
-```bash
+| 檢查項目 | 查詢結果 |
+| --- | --- |
+| 預報資料筆數 | 132 筆 |
+| 預報涵蓋縣市數 | 22 個 |
+| 預報最早開始時間 | 2026-09-24 12:00:00 |
+| 預報最晚結束時間 | 2026-09-26 18:00:00 |
+| 重複的「縣市＋開始時間＋結束時間」組合 | 0 組 |
+| 測站資料筆數／不重複測站數 | 363 筆／363 站 |
+| 測站觀測時間 | 2026-09-25 14:50:00 |
+| 同時具有非空座標與氣溫的測站 | 349 站 |
+
+預報資料的時間範圍已早於報告整理日期，顯示資料庫保留了先前取得的紀錄。132 筆是目前儲存的總量，不能視為一次 API 回應的固定筆數；363 站也僅代表此次資料快照。另有 14 筆測站紀錄缺少座標或氣溫，不符合目前地圖的顯示條件。
+
+### 6.2 預報資料範例
+
+以下列出資料庫中臺中市的部分預報，用於說明欄位與時段的對應關係：
+
+| 預報時段 | 天氣 | 最低溫 | 最高溫 | 降雨機率 |
+| --- | --- | --- | --- | --- |
+| 2026-09-25 06:00～18:00 | 晴時多雲 | 25°C | 33°C | 0% |
+| 2026-09-25 12:00～18:00 | 晴時多雲 | 30°C | 33°C | 0% |
+| 2026-09-25 18:00～2026-09-26 06:00 | 晴時多雲 | 26°C | 30°C | 0% |
+
+同一天出現部分重疊的區間，說明只用起訖時間作為唯一條件，仍可能留下不同次更新的重疊預報。這也是後續需要處理資料版本與過期紀錄的原因。
+
+### 6.3 現有驗證腳本
+
+| 腳本 | 檢查內容 | 執行條件與影響 |
+| --- | --- | --- |
+| `test_cwa_api.py` | 兩個資料集的連線與回應，以及無效授權碼是否觸發例外 | 需要網路與有效授權碼；屬 API 診斷腳本 |
+| `test_data_processor.py` | 預報欄位、數值型別及觀測資料非空 | 會向真實 API 取資料，屬整合驗證 |
+| `test_database.py` | 初始化、寫入、重複更新、地區／日期查詢與更新時間 | 會先清空預設資料庫的兩張表，再重新抓取資料 |
+| `test_chart.py` | 兩條溫度曲線及部分圖表樣式 | 依賴本機已有臺中市預報資料 |
+
+本次報告整理已完成程式對照與資料庫唯讀查詢，未執行上述四支腳本，也未進行本機或線上介面的操作驗證，因此不將它們列為已通過測試。現有腳本多依賴真實 API 或資料庫，尚非彼此隔離的單元測試。
+
+## 七、環境建置與執行方式
+
+### 7.1 本機 Streamlit
+
+以 Python 3.11 以上版本作為本機環境起點；實際相容版本仍須符合 `requirements.txt` 中各套件的需求。Windows PowerShell 可依序執行：
+
+```powershell
 python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-**Windows：**
-```bash
-.venv\Scripts\activate
+在專案根目錄建立 `.env`，填入自行取得的中央氣象署授權碼：
+
+```dotenv
+CWA_API_KEY=YOUR_CWA_API_KEY
 ```
 
-**macOS / Linux：**
-```bash
-source .venv/bin/activate
-```
-
-### 2. 安裝依賴套件
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. 設定 CWA API Key
-
-前往 [中央氣象署 Open Data 平台](https://opendata.cwa.gov.tw/) 申請免費 API 授權碼，並選擇下列其中一種方式設定：
-
-**方式 A：`.streamlit/secrets.toml`（推薦於雲端部署）**
-```toml
-CWA_API_KEY = "CWA-YOUR-API-KEY-HERE"
-```
-
-**方式 B：`.env`（推薦於本機開發）**
-```env
-CWA_API_KEY=CWA-YOUR-API-KEY-HERE
-```
-
-> ⚠️ **安全提醒：請勿將 API Key 上傳至 GitHub！**
-> `.gitignore` 已預設排除 `.env` 與 `.streamlit/secrets.toml`。
-
-### 4. 啟動應用程式
-
-```bash
-streamlit run app.py
-```
-
-瀏覽器開啟 [http://localhost:8501](http://localhost:8501)
-
----
-
-## 🧪 九、測試說明 (Testing)
-
-本作業包含三支單元測試腳本，覆蓋核心功能：
-
-| 測試腳本 | 測試範圍 |
-|----------|----------|
-| `test_cwa_api.py` | CWA API 連線、HTTP 回應狀態碼、JSON 結構驗證 |
-| `test_data_processor.py` | JSON → Pandas DataFrame 轉換、欄位完整性、型別正確性 |
-| `test_database.py` | SQLite 資料表初始化、資料寫入、SQL 查詢正確性 |
-
-執行測試：
-```bash
-python -m pytest test_cwa_api.py test_data_processor.py test_database.py -v
-```
-
----
-
-## 🌐 十、版本控制說明 (Git)
-
-```bash
-# 初始化並提交
-git init
-git add .
-git commit -m "feat: HW1 Taiwan Weather Forecast Dashboard"
-git branch -M main
-git remote add origin https://github.com/<YOUR_USERNAME>/<YOUR_REPO>.git
-git push -u origin main
-```
-
-> **注意：** 執行 `git push` 前，請先以 `git status` 確認以下檔案**未**出現在 Changes 清單：
-> - `.env`
-> - `.streamlit/secrets.toml`
-> - `data.db`
-
----
-
-## ☁️ 十一、Streamlit Cloud 部署 (Deployment)
-
-1. 前往 [https://streamlit.io/cloud](https://streamlit.io/cloud) 並登入
-2. 點選 **New app** → 選擇 GitHub Repository
-3. 設定 Main file path：`app.py`
-4. 點選 **Advanced settings → Secrets** 頁籤，貼入：
+也可使用作業系統環境變數或 `.streamlit/secrets.toml`：
 
 ```toml
-CWA_API_KEY = "CWA-YOUR-API-KEY-HERE"
+CWA_API_KEY = "YOUR_CWA_API_KEY"
 ```
 
-5. 點選 **Deploy!**
+啟動應用程式：
 
----
-
-## 📝 十二、心得與學習反思 (Reflection)
-
-> 請在此填寫你的作業心得（100 字以上）：
-
-```
-（請在此填寫）
-- 本次作業學習到了哪些新技術或概念？
-- 遇到了哪些困難？如何解決？
-- 對資料流程（API → 資料庫 → 視覺化）的理解與感想
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
----
+開啟終端機顯示的網址，通常為 `http://localhost:8501`。選擇縣市與日期後，可查看指標卡及各分頁；需要新資料時按下「更新氣象資料」。專案的 `.gitignore` 已排除 `.env`、`.streamlit/secrets.toml` 與本機資料庫檔案。
 
-## 📚 十三、參考資料 (References)
+### 7.2 瀏覽器版產生與部署設定
 
-1. [中央氣象署 Open Data 平台](https://opendata.cwa.gov.tw/)
+修改 Python 模組後，執行下列指令重新產生網頁入口，讓內嵌程式與來源檔案同步：
+
+```powershell
+.\.venv\Scripts\python.exe build_index_html.py
+```
+
+Vercel 部署使用 `index.html`、`api/cwa.js` 與 `vercel.json`，並需在伺服器環境設定 `CWA_API_KEY`。目前產生器清單另列有不存在的 `sqlite3.py`，執行時會提示並略過；資料庫模組本身已有 SQLite 可用性檢查及記憶體替代方式。
+
+單獨打開 HTML 檔案無法提供 `/api/cwa` 代理服務，完整資料更新需要具備該端點的執行環境。本報告未驗證實際 Vercel 部署狀態。
+
+### 7.3 驗證指令
+
+完成環境與授權設定後，可分別執行：
+
+```powershell
+.\.venv\Scripts\python.exe test_cwa_api.py
+.\.venv\Scripts\python.exe test_data_processor.py
+.\.venv\Scripts\python.exe test_chart.py
+```
+
+`test_database.py` 會清空 `data.db` 的既有資料，應先備份資料庫或在獨立專案副本中執行：
+
+```powershell
+.\.venv\Scripts\python.exe test_database.py
+```
+
+## 八、實作討論與改善方向
+
+| 議題 | 現行處理與限制 | 後續改善方向 |
+| --- | --- | --- |
+| JSON 要素分散 | 以起訖時間對齊各天氣要素 | 加入缺少要素、異常時間格式與空回應的測試 |
+| 缺測資料 | 數值轉換失敗時採預設值，部分地圖標記直接略過 | 保留缺值並顯示「無資料」，避免預設值被誤認為真實天氣 |
+| 預報版本與過期資料 | 相同唯一組合更新，但不同時段持續累積 | 記錄預報發布批次，依有效時間篩選或淘汰舊資料 |
+| 日期篩選 | 日期選單僅影響指標卡；指標卡取第一個時段 | 統一各分頁的篩選條件，清楚標示時段或計算每日摘要 |
+| 預報與觀測欄位 | 觀測表的 `PoP` 實際存放相對濕度 | 將濕度獨立為欄位，避免與預報降雨機率混用 |
+| 更新狀態 | 觀測失敗時預報仍可更新成功；600 秒快取不會排程抓取 API | 分別顯示兩種資料的更新狀態與時間，依需求設計自動更新 |
+| 瀏覽器儲存 | SQLite 不可用時改存記憶體，沒有跨工作階段持久化 | 依需求導入瀏覽器儲存或後端資料庫 |
+| 測試隔離 | 多數腳本依賴網路，資料庫腳本操作預設資料庫 | 使用固定 JSON 測試資料、模擬請求及暫存資料庫 |
+
+## 九、學習心得與結論
+
+本作業呈現出資料應用的核心不只是取得 API 回應，而是維持資料在不同階段的一致性。氣象資料中的地點、起訖時間與欄位意義會直接影響查詢和圖表結果；若預報與觀測混用，或把補值當作真實數值，即使介面能正常顯示，也可能造成錯誤解讀。因此，資料整理與視覺化必須同時考慮數值來源、有效時間及缺測情況。
+
+模組化設計讓 API、資料處理、儲存與介面各自負責明確工作，也使問題較容易追蹤。本機與瀏覽器版本則進一步說明，相同 Python 程式在不同環境下，仍需處理授權碼位置、HTTP 請求與儲存方式的差異。後續若補上測試隔離、資料版本管理與一致的日期篩選，系統的結果會更容易驗證，也更適合持續擴充。
+
+目前專案已具備氣象資料擷取、整理、儲存、查詢與視覺化的主要實作；現有資料庫的查詢結果提供了具體資料成果。報告同時保留尚未驗證的執行項目與已知限制，作為後續改進依據。
+
+## 十、參考資源
+
+1. [中央氣象署氣象資料開放平臺](https://opendata.cwa.gov.tw/)
 2. [Streamlit 官方文件](https://docs.streamlit.io/)
-3. [Plotly Python 圖表庫](https://plotly.com/python/)
-4. [Folium 互動地圖](https://python-visualization.github.io/folium/)
-5. [SQLite 官方文件](https://www.sqlite.org/docs.html)
-6. [Pandas 使用手冊](https://pandas.pydata.org/docs/)
-7. [Requests 使用手冊](https://requests.readthedocs.io/)
+3. [Pandas 官方文件](https://pandas.pydata.org/docs/)
+4. [SQLite 官方文件](https://www.sqlite.org/docs.html)
+5. [Plotly Python 官方文件](https://plotly.com/python/)
+6. [Folium 官方文件](https://python-visualization.github.io/folium/)
+7. [Stlite 專案](https://github.com/whitphx/stlite)
 
----
-
-## 📄 授權聲明 (License)
-
-本專案僅供個人學習與課堂作業使用。氣象資料版權歸屬**中央氣象署**，使用須遵守 [CWA Open Data 使用規範](https://opendata.cwa.gov.tw/about)。
-��央氣象署 CWA Open Data API
-   ├── O-A0003-001: 全台 363 自動氣象站即時觀測資料
-   └── F-C0032-001: 22 縣市今明 36 小時天氣預報
-
-2. weather_api.py → requests.get() → HTTP 200 → JSON
-
-3. data_processor.py
-   ├── parse_observation_json() → 觀測站 DataFrame (15 欄)
-   └── parse_forecast_json() → 預報 DataFrame (8 欄)
-
-4. database.py → SQLite (data.db)
-   ├── StationObservations (363 rows)
-   └── TemperatureForecasts (66 rows)
-       UNIQUE constraint 防止重複寫入
-
-5. SQL Query
-   SELECT * FROM TemperatureForecasts WHERE regionName = ? ORDER BY startTime;
-
-6. app.py → Streamlit Dashboard
-   ├── 4 張 Metric Card (MaxT / MinT / PoP / Wx)
-   ├── Plotly 溫度折線圖
-   ├── 天氣資料表 (st.dataframe)
-   └── Folium 台灣互動地圖
-```
-
----
-
-## 🌐 GitHub 部署說明
-
-### 初始化 Git Repository
-
-```bash
-git init
-git add .
-git commit -m "feat: initial Taiwan Weather Forecast project"
-git branch -M main
-```
-
-### 連接遠端 Repository
-
-```bash
-git remote add origin https://github.com/<YOUR_USERNAME>/<YOUR_REPO>.git
-git push -u origin main
-```
-
-> **注意：** 執行 `git push` 前，請先執行 `git status` 確認：
-> - `.env` 未出現在 Changes 清單中
-> - `.streamlit/secrets.toml` 未出現在 Changes 清單中
-> - `data.db` 未出現在 Changes 清單中
-
----
-
-## ☁️ Streamlit Cloud 部署說明
-
-1. 前往 [https://streamlit.io/cloud](https://streamlit.io/cloud) 登入
-2. 點選 **New app** → 選擇你的 GitHub Repository
-3. 設定 Main file path：`app.py`
-4. 點選 **Advanced settings** → **Secrets** 頁籤
-5. 貼入以下內容（填入你的真實 API Key）：
-
-```toml
-CWA_API_KEY = "CWA-YOUR-API-KEY-HERE"
-```
-
-6. 點選 **Deploy!**
-
----
-
-## ⚡ Vercel (stlite / WebAssembly) 部署說明
-
-本專案以 Stlite 在瀏覽器呈現介面，並由 Vercel Function 代為呼叫中央氣象署 API。授權碼只保存在 Vercel 伺服器環境變數，不會嵌入 index.html。
-
-1. 將本 GitHub Repository 匯入 [Vercel](https://vercel.com/)，Framework Preset 選擇 **Other**。
-2. 在 Vercel 專案開啟 **Settings → Environment Variables**，新增 CWA_API_KEY，值填入中央氣象署 API 授權碼，並勾選要使用的環境（通常是 Production）。
-3. 儲存環境變數後重新部署，讓新的 Function 取得設定。
-4. 開啟部署網址；側邊欄會顯示授權由 Vercel 代管，按「🔄 更新氣象資料」即可載入資料，不必在網頁輸入授權碼。
-
-本機執行 Streamlit 時仍可使用 .streamlit/secrets.toml 或 CWA_API_KEY 環境變數。請勿將授權碼提交到 GitHub。
----
-
-## 📝 授權 (License)
-
-本專案僅供個人學習與課堂作業使用。氣象資料版權歸屬中央氣象署，使用須遵守 [CWA Open Data 使用規範](https://opendata.cwa.gov.tw/about)。
-
+本報告的實作說明以專案原始碼為依據；成果數據取自整理當日的本機 `data.db` 唯讀查詢。
